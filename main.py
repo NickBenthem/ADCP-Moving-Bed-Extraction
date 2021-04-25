@@ -8,6 +8,7 @@ import pandas
 import pandas as pd
 import xmltodict
 import requests
+import logging
 
 def extract_critical_info(file_path=None):
     xml_data = open( file_path,'r',encoding="utf-8").read()  # Read data
@@ -63,9 +64,14 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=logging.INFO,
+        datefmt='%Y-%m-%d %H:%M:%S')
+    logging.getLogger().setLevel(logging.INFO)
 
     # Scrape the file to generate a CSV.
-
+    logging.info("Beginning scrape of test-folder.")
     file_folder = args.test_folder
     list_write = []
     for path in Path(file_folder).rglob('*.xml'):
@@ -75,15 +81,18 @@ if __name__ == '__main__':
             list_write.append(extract_critical_info(path.resolve()))
     # Now write to a path.
     df = pd.DataFrame(list_write)
-
-
+    logging.info("Test folder successfully scraped.")
+    logging.info("Beginning web scrape")
     # Now we need to get some information from the web.
 
     site_ids = df['siteid'].unique()
     usgs_dict = {}
 
+
     for row in site_ids:
         usgs_dict[row] = get_usgs_web_date(row)
+    logging.info("Web scrape successfully scraped.")
+    logging.info("Beginning merge ")
 
     # we need to initialize the df to have a None value column for things we want to add.
     df["gage_height_va"] = None
@@ -97,7 +106,9 @@ if __name__ == '__main__':
 
         # Now that we've matched - we can just append the value we want.
         df.iloc[index]["gage_height_va"] = matched_column["gage_height_va"]
+    logging.info("Merge complete ")
+    logging.info(f"Writing to CSV path: {args.csvfile} ")
 
     df.to_csv(args.csvfile,index=False)
-
+    logging.info("Write complete.")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
