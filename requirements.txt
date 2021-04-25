@@ -4,7 +4,7 @@ chardet==4.0.0
 idna==2.10
 lxml==4.6.3
 numpy==1.20.2
-pandas @ git+https://github.com/pandas-dev/pandas@714f7d7fa6580e5be796ca3746eb37a6743d48e0
+pandas
 python-dateutil==2.8.1
 pytz==2021.1
 requests==2.25.1
