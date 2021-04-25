@@ -4,7 +4,6 @@
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
 from pathlib import Path
 
-import pandas
 import pandas as pd
 import xmltodict
 import requests
