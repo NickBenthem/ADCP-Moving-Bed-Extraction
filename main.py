@@ -10,8 +10,9 @@ import xmltodict
 import requests
 import logging
 
+
 def extract_critical_info(file_path=None):
-    xml_data = open( file_path,'r',encoding="utf-8").read()  # Read data
+    xml_data = open(file_path, 'r', encoding="utf-8").read()  # Read data
     xmlDict = xmltodict.parse(xml_data)  # Parse XML
     rootkeys = xmlDict['Channel'].keys()
     MovingBedSpeed = xmlDict['Channel']['QA']['MovingBedTest']['MovingBedSpeed']
@@ -34,7 +35,7 @@ def extract_critical_info(file_path=None):
         "MovingBedTestResults": movingbed,
         "StationName": stationname,
         "siteid": siteid,
-        "MovingBedTestQuality" : MovingBedQuality
+        "MovingBedTestQuality": MovingBedQuality
     })
 
 
@@ -50,14 +51,15 @@ def get_usgs_web_date(site_id: int = None):
     df = pd.DataFrame.from_records(raw_data)
     df = df.rename(columns=df.iloc[0]).drop(df.index[0])
 
-    return(df)
+    return (df)
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Process some files to get critical ADCP information.')
-    parser.add_argument('--test-folder',  type=str, default="/Users/nick/downloads/Adam_Moving_bed" ,
+    parser.add_argument('--test-folder', type=str, default="/Users/nick/downloads/Adam_Moving_bed",
                         help='The folder where this is located - either posix or relative.')
     parser.add_argument('--csvfile', default="moving_bed_results.csv",
                         help='The file  where to save the csv that was generated - either posix or relative.')
@@ -78,6 +80,7 @@ if __name__ == '__main__':
         if 'QRev' not in str(path.name):
             pass
         else:
+            logging.info(f"scraping: {path.resolve()}")
             list_write.append(extract_critical_info(path.resolve()))
     # Now write to a path.
     df = pd.DataFrame(list_write)
@@ -88,7 +91,6 @@ if __name__ == '__main__':
     site_ids = df['siteid'].unique()
     usgs_dict = {}
 
-
     for row in site_ids:
         usgs_dict[row] = get_usgs_web_date(row)
     logging.info("Web scrape successfully scraped.")
@@ -96,12 +98,14 @@ if __name__ == '__main__':
 
     # we need to initialize the df to have a None value column for things we want to add.
     df["gage_height_va"] = None
-    for index,row in df.iterrows():
+    for index, row in df.iterrows():
         # print(usgs_dict[row['siteid']])
 
         # Compare the two datasets - we need the lowest here.
-        usgs_dict[row['siteid']]["time_diff"] = abs(pd.to_datetime(usgs_dict[row['siteid']]["measurement_dt"]) - pd.to_datetime(str(row["TestTimestamp"]).strip(),format="%y/%m/%d,%H:%M:%S.%f"))
-        usgs_dict[row['siteid']].sort_values(by="time_diff",ascending=True,inplace=True)
+        usgs_dict[row['siteid']]["time_diff"] = abs(
+            pd.to_datetime(usgs_dict[row['siteid']]["measurement_dt"]) - pd.to_datetime(
+                str(row["TestTimestamp"]).strip(), format="%y/%m/%d,%H:%M:%S.%f"))
+        usgs_dict[row['siteid']].sort_values(by="time_diff", ascending=True, inplace=True)
         matched_column = usgs_dict[row['siteid']].iloc[0]
 
         # Now that we've matched - we can just append the value we want.
@@ -109,6 +113,6 @@ if __name__ == '__main__':
     logging.info("Merge complete ")
     logging.info(f"Writing to CSV path: {args.csvfile} ")
 
-    df.to_csv(args.csvfile,index=False)
+    df.to_csv(args.csvfile, index=False)
     logging.info("Write complete.")
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
