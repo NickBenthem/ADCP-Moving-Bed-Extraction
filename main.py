@@ -2,6 +2,7 @@
 
 # Press ⌃R to execute it or replace it with your code.
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -42,10 +43,21 @@ class extracter():
             if len(possible_matches) > 1:
                 logging.info(f"\t  ({possible_matches} timestamps were found - grabbing the first.")
             TestTimestamp = possible_matches[0]
+            try:
+                TestTimestamp = pd.to_datetime(
+                str(TestTimestamp).strip(), format="%y/%m/%d,%H:%M:%S.%f")
+            except:
+                TestTimestamp = None
+                logging.warning(f'Unparsable TestTimestamp found.. Found datetime was { str(TestTimestamp).strip()}. Leaving empty.')
+
             # Moving bed
             movingbed = xmlDict['Channel']['QA']['MovingBedTestResult']['#text']
             # Station Name
-            stationname = xmlDict['Channel']['SiteInformation']['StationName']['#text']
+            stationname = None
+            try:
+                stationname = xmlDict['Channel']['SiteInformation']['StationName']['#text']
+            except:
+                logging.warning("stationname not found - skipping.")
             siteid = xmlDict['Channel']['SiteInformation']['SiteID']['#text']
             return ({
                 "MovingBedSpeed": MovingBedSpeed["#text"],
@@ -98,52 +110,61 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
 
     # Scrape the file to generate a CSV.
-    logging.info("Beginning scrape of test-folder.")
+    logging.info("Beginning scrape of test-folder-root.")
     file_folder = args.test_folder
-    list_write = []
-    for path in Path(file_folder).rglob('*.xml'):
-        if 'QRev' not in str(path.name):
-            pass
-        else:
-            logging.info(f"scraping: {path.resolve()}")
-            extract = extracter(path.resolve())
-            data = extract.extract_critical_info()
-            if data: # dont append empty.
-                list_write.append(data)
-    # Now write to a path.
-    df = pd.DataFrame(list_write)
+    for folder in [ f.path for f in os.scandir(file_folder) if f.is_dir() ]:
+        logging.info(f"Running extract for {folder}")
+        list_write = []
+        for path in Path(folder).rglob('*.xml'):
+            if 'QRev' not in str(path.name):
+                pass
+            else:
+                logging.info(f"scraping: {path.resolve()}")
+                extract = extracter(path.resolve())
+                data = extract.extract_critical_info()
+                if data: # dont append empty.
+                    list_write.append(data)
+        # Now write to a path.
+        df = pd.DataFrame(list_write)
 
-    logging.info(f"Test folder successfully scraped. Found {len(list_write)} datasets.")
-    logging.info("Beginning web scrape")
-    # Now we need to get some information from the web.
-    assert len(list_write) != 0, "No QREV XML files were found - check your files."
-    site_ids = df['siteid'].unique()
-    usgs_dict = {}
+        logging.info(f"Test folder successfully scraped. Found {len(list_write)} datasets.")
+        logging.info("Beginning web scrape")
+        # Now we need to get some information from the web.
+        if len(list_write) == 0:
+            logging.warning(f"No QREV XML files were found for {folder}- check your files.")
+            continue
 
-    for row in site_ids:
-        logging.info(f"Scraping USGS site for site_id {row}")
-        data = get_usgs_web_date(row)
-        if data is not None:
-            usgs_dict[row] = data
-        else: # Remove that site_id from the data set - it's garbage.
-            logging.warning(f"Removing site_id {row} from the dataset")
-            df = df[df['siteid'] != row]
-    logging.info("Web scrape successfully scraped.")
-    logging.info("Beginning merge ")
+        site_ids = df['siteid'].unique()
+        usgs_dict = {}
 
-    # we need to initialize the df to have a None value column for things we want to add.
-    df["gage_height_va"] = None
-    for index, row in df.iterrows():
-        # Compare the two datasets - we need the lowest here.
-        usgs_dict[row['siteid']]["time_diff"] = abs(
-            pd.to_datetime(usgs_dict[row['siteid']]["measurement_dt"]) - pd.to_datetime(
-                str(row["TestTimestamp"]).strip(), format="%y/%m/%d,%H:%M:%S.%f"))
-        usgs_dict[row['siteid']].sort_values(by="time_diff", ascending=True, inplace=True)
-        matched_column = usgs_dict[row['siteid']].iloc[0]
+        for row in site_ids:
+            logging.info(f"Scraping USGS site for site_id {row}")
+            data = get_usgs_web_date(row)
+            if data is not None:
+                usgs_dict[row] = data
+            else: # Remove that site_id from the data set - it's garbage.
+                logging.warning(f"Removing site_id {row} from the dataset")
+                df = df[df['siteid'] != row]
+        logging.info("Web scrape successfully scraped.")
+        logging.info("Beginning merge ")
 
-        # Now that we've matched - we can just append the value we want.
-        df.at[index,'gage_height_va'] = matched_column["gage_height_va"]
-    logging.info("Merge complete ")
-    logging.info(f"Writing to CSV path: {args.csvfile} ")
-    df.to_csv(args.csvfile, index=False)
-    logging.info("Write complete.")
+        # we need to initialize the df to have a None value column for things we want to add.
+        df["gage_height_va"] = None
+        for index, row in df.iterrows():
+            # Compare the two datasets - we need the lowest here.
+            try:
+                usgs_dict[row['siteid']]["time_diff"] = abs(
+                    pd.to_datetime(usgs_dict[row['siteid']]["measurement_dt"]) - pd.to_datetime(
+                        str(row["TestTimestamp"]).strip()))
+                usgs_dict[row['siteid']].sort_values(by="time_diff", ascending=True, inplace=True)
+                matched_column = usgs_dict[row['siteid']].iloc[0]
+
+                # Now that we've matched - we can just append the value we want.
+                df.at[index,'gage_height_va'] = matched_column["gage_height_va"]
+            except:
+                logging.warning(f'Unable to match USGS site data with CSV. Found datetime was { str(row["TestTimestamp"]).strip()} Passing.')
+        logging.info("Merge complete ")
+        logging.info(f"Writing to CSV path: {os.path.join(folder,args.csvfile)} ")
+        df.to_csv(os.path.join(folder,args.csvfile), index=False)
+        logging.info("Write complete.")
+# See PyCharm help at https://www.jetbrains.com/help/pycharm/
