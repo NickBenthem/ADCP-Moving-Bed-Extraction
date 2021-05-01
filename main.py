@@ -102,16 +102,22 @@ if __name__ == '__main__':
                         help='The file  where to save the csv that was generated - either posix or relative.')
 
     args = parser.parse_args()
-
+    file_folder = args.test_folder
     logging.basicConfig(
         format='%(asctime)s %(levelname)-8s %(message)s',
         level=logging.INFO,
-        datefmt='%Y-%m-%d %H:%M:%S')
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.FileHandler("parser_output.log"),
+            logging.StreamHandler()
+        ]
+        )
+
     logging.getLogger().setLevel(logging.INFO)
 
     # Scrape the file to generate a CSV.
     logging.info("Beginning scrape of test-folder-root.")
-    file_folder = args.test_folder
+
     for folder in [ f.path for f in os.scandir(file_folder) if f.is_dir() ]:
         logging.info(f"Running extract for {folder}")
         list_write = []
