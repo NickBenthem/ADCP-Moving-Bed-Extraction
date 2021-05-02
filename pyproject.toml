@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "usgs_mbe"
+version = "0.1.1"
+description = "USGS MovingBedExtraction - Parser to generate summary data from ADCP files for the USGS."
+authors = ["Nick Benthem <nick@benthem.io>"]
+keywords = ["ADCP", "MovingBedExtraction","USGS"]
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/NickBenthem/ADCP-Moving-Bed-Extraction"
+repository = "https://github.com/NickBenthem/ADCP-Moving-Bed-Extraction"
+include = [
+    "LICENSE",
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pandas = "^1.2.4"
+xmltodict = "^0.12.0"
+lxml = "^4.6.3"
+requests = "^2.25.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[tool.poetry.scripts]
+usgs_mbe = 'usgs_mbe:main.cli'
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
